@@ -84,10 +84,16 @@ if "ingestion_done" not in st.session_state:
 # Sidebar Configuration
 with st.sidebar:
     st.markdown("<h2 style='color: #38bdf8; margin-top:0;'>⚙️ Settings</h2>", unsafe_allow_html=True)
-    api_key_input = st.text_input("Google AI Studio API Key", type="password", value=st.session_state.api_key)
     
-    if api_key_input:
-        st.session_state.api_key = api_key_input
+    # Check if loaded from secrets/environment first to avoid displaying/exposing it
+    env_api_key = os.getenv("GEMINI_API_KEY", "")
+    if env_api_key:
+        st.success("🔒 API Key loaded from secrets")
+        st.session_state.api_key = env_api_key
+    else:
+        api_key_input = st.text_input("Google AI Studio API Key", type="password", value=st.session_state.api_key)
+        if api_key_input:
+            st.session_state.api_key = api_key_input
         
     if st.button("🗑️ Reset Database & Swarm", use_container_width=True):
         database.clear_db()
