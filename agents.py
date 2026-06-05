@@ -99,9 +99,19 @@ class RollingBucketRateLimiter:
         self.max_requests = max_requests
         self.period = period
         self.requests = deque()
+        self.last_request_time = 0.0
+        self.min_interval = period / max_requests
 
     def acquire(self):
         now = time.time()
+        
+        # Enforce minimum spacing interval to prevent burst triggers
+        elapsed = now - self.last_request_time
+        if elapsed < self.min_interval:
+            sleep_needed = self.min_interval - elapsed
+            time.sleep(sleep_needed)
+            now = time.time()
+            
         # Clean up requests older than the sliding window period
         while self.requests and self.requests[0] <= now - self.period:
             self.requests.popleft()
@@ -116,7 +126,9 @@ class RollingBucketRateLimiter:
             while self.requests and self.requests[0] <= now - self.period:
                 self.requests.popleft()
         
-        self.requests.append(time.time())
+        execution_time = time.time()
+        self.requests.append(execution_time)
+        self.last_request_time = execution_time
 
 # Character-based sliding window rate limiter to respect TPM limits (e.g. 90,000 chars / 25,000 tokens per minute)
 class TokenRollingBucketRateLimiter:
