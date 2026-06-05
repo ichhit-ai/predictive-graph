@@ -278,11 +278,32 @@ def generate_embeddings_batch_with_backoff(model_name, contents, api_key=None):
         all_embeddings.extend(batch_res)
     return all_embeddings
 
+# Suffixes, honorifics, and generic entities to strip for matching stems
+SUFFIXES_AND_HONORIFICS = {
+    'inc', 'llc', 'corp', 'co', 'corporation', 'company', 'ltd', 'limited', 'hamilton',
+    'mr', 'mrs', 'ms', 'dr', 'prof', 'general', 'detective', 'inspector', 'sir', 'madam',
+    'government', 'department', 'agency'
+}
+
+def entity_stem(name):
+    # Lowercase, replace non-word characters
+    cleaned = re.sub(r'[^\w\s]', '', name.lower())
+    tokens = cleaned.split()
+    # Filter out suffixes and honorifics
+    filtered = [t for t in tokens if t not in SUFFIXES_AND_HONORIFICS]
+    return " ".join(filtered).strip()
+
 # Pure Python Robust Fuzzy similarity for Entity Resolution
 def token_similarity(str1, str2):
     s1 = str1.lower().replace("’", "'").replace(".", "").strip()
     s2 = str2.lower().replace("’", "'").replace(".", "").strip()
     if s1 == s2:
+        return 1.0
+        
+    # Smarter fuzzy suffix stem matching
+    stem1 = entity_stem(str1)
+    stem2 = entity_stem(str2)
+    if stem1 and stem2 and stem1 == stem2:
         return 1.0
         
     # N-gram similarity (handles spelling variations like "August" / "Auguste")
@@ -364,8 +385,8 @@ def retrieve_relevant_subgraph(query, api_key, top_k=15):
     except Exception as e:
         print(f"Error embedding query for subgraph: {e}")
         # Fallback to top degree/centrality nodes
-        nodes_str = "\n".join([f"- {n['name']} ({n['type']}): {n['description']}" for n in nodes[:top_k]])
-        edges_str = "\n".join([f"- {e['source']} -> {e['target']} via {e['type']}" for e in edges[:top_k]])
+        nodes_str = "\n".join([f"- {n['name']} ({n['type']}, Conf: {n.get('confidence', 1.0):.2f}): {n['description']}" for n in nodes[:top_k]])
+        edges_str = "\n".join([f"- {e['source']} -> {e['target']} via {e['type']} (Conf: {e.get('confidence', 1.0):.2f})" for e in edges[:top_k]])
         return nodes_str, edges_str
         
     scored_nodes = []
@@ -385,8 +406,8 @@ def retrieve_relevant_subgraph(query, api_key, top_k=15):
         if e["source"].lower() in top_node_names and e["target"].lower() in top_node_names:
             filtered_edges.append(e)
             
-    nodes_str = "\n".join([f"- {n['name']} ({n['type']}): {n['description']}" for n in top_nodes])
-    edges_str = "\n".join([f"- {e['source']} -> {e['target']} via {e['type']}" for e in filtered_edges[:25]])
+    nodes_str = "\n".join([f"- {n['name']} ({n['type']}, Conf: {n.get('confidence', 1.0):.2f}): {n['description']}" for n in top_nodes])
+    edges_str = "\n".join([f"- {e['source']} -> {e['target']} via {e['type']} (Conf: {e.get('confidence', 1.0):.2f})" for e in filtered_edges[:25]])
     return nodes_str, edges_str
 
 
@@ -502,6 +523,7 @@ class ArchitectAgent:
             2. Be exhaustive! Do not skip minor actors, objects, or locations. Extract as many entities as the text supports (aim for 15-30 entities per chunk if the text is dense).
             3. For each entity, write a detailed context description.
             4. Identify EVERY explicit relationship between the extracted entities. Every relationship must be directly backed by a verbatim sentence in the text as evidence.
+            5. Assign a confidence score (0.0 to 1.0) to every entity and relation based on how explicitly it is stated in the text (1.0 = explicit fact, 0.5 = implied/weak connection).
             
             CRITICAL RULES:
             - DO NOT extract pronouns ("he", "she", "it", "they"). Resolve them to their proper names (e.g. write "August Dupin" instead of "he").
@@ -514,8 +536,8 @@ class ArchitectAgent:
             
             system = """You are a highly precise and thorough Graph Extractor. Output a strict JSON structure containing:
             {
-              "entities": [{"name": "Canonical Entity Name", "type": "Entity Type", "description": "Brief context from text"}],
-              "relations": [{"source": "Source Entity Name", "target": "Target Entity Name", "type": "RELATION_TYPE", "quote": "Verbatim sentence proving connection"}]
+              "entities": [{"name": "Canonical Entity Name", "type": "Entity Type", "description": "Brief context from text", "confidence": 1.0}],
+              "relations": [{"source": "Source Entity Name", "target": "Target Entity Name", "type": "RELATION_TYPE", "quote": "Verbatim sentence proving connection", "confidence": 1.0}]
             }"""
             
             try:
@@ -532,12 +554,18 @@ class ArchitectAgent:
                     tgt = rel.get("target") or rel.get("object")
                     rtype = rel.get("type") or rel.get("predicate")
                     quote = rel.get("quote") or rel.get("evidence") or rel.get("context")
+                    conf = rel.get("confidence")
+                    try:
+                        conf_val = float(conf) if conf is not None else 1.0
+                    except (ValueError, TypeError):
+                        conf_val = 1.0
                     if src and tgt and rtype:
                         raw_edges.append({
                             "source": str(src),
                             "target": str(tgt),
                             "type": str(rtype),
-                            "quote": str(quote or "")
+                            "quote": str(quote or ""),
+                            "confidence": conf_val
                         })
             except Exception as e:
                 print(f"Error extracting chunk {idx}: {e}")
@@ -566,13 +594,26 @@ class ArchitectAgent:
                     # Merge descriptions
                     if n.get("description") and n["description"] not in resolved_entities[canonical]["description"]:
                         resolved_entities[canonical]["description"] += "; " + n["description"]
+                    # Average confidence
+                    n_conf = n.get("confidence")
+                    try:
+                        n_conf_val = float(n_conf) if n_conf is not None else 1.0
+                    except (ValueError, TypeError):
+                        n_conf_val = 1.0
+                    resolved_entities[canonical]["confidence"] = (resolved_entities[canonical]["confidence"] + n_conf_val) / 2.0
                     found_match = True
                     break
             
             if not found_match:
+                n_conf = n.get("confidence")
+                try:
+                    n_conf_val = float(n_conf) if n_conf is not None else 1.0
+                except (ValueError, TypeError):
+                    n_conf_val = 1.0
                 resolved_entities[name] = {
                     "type": n["type"],
-                    "description": n.get("description", "")
+                    "description": n.get("description", ""),
+                    "confidence": n_conf_val
                 }
         
         # === BATCHED DATABASE WRITES ===
@@ -582,7 +623,13 @@ class ArchitectAgent:
         node_ids = []
         for name, data in resolved_entities.items():
             node_id = name.lower()
-            nodes_batch.append({"id": node_id, "name": name, "type": data["type"], "description": data["description"]})
+            nodes_batch.append({
+                "id": node_id, 
+                "name": name, 
+                "type": data["type"], 
+                "description": data["description"],
+                "confidence": data.get("confidence", 1.0)
+            })
             texts_to_embed.append(f"{name}: {data['description']}")
             node_ids.append(node_id)
             
@@ -619,7 +666,14 @@ class ArchitectAgent:
                     canonical_tgt = canonical
             
             edge_id = f"{canonical_src.lower()}->{canonical_tgt.lower()}->{e['type'].lower()}"
-            edges_batch.append({"id": edge_id, "source": canonical_src, "target": canonical_tgt, "type": e["type"], "quote": e.get("quote", "")})
+            edges_batch.append({
+                "id": edge_id, 
+                "source": canonical_src, 
+                "target": canonical_tgt, 
+                "type": e["type"], 
+                "quote": e.get("quote", ""),
+                "confidence": e.get("confidence", 1.0)
+            })
         
         save_edges_batch(edges_batch)
         

@@ -30,7 +30,8 @@ def init_db():
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
-            description TEXT
+            description TEXT,
+            confidence REAL DEFAULT 1.0
         )
     """)
     
@@ -42,6 +43,7 @@ def init_db():
             type TEXT NOT NULL,
             quote TEXT,
             weight INTEGER DEFAULT 1,
+            confidence REAL DEFAULT 1.0,
             FOREIGN KEY(source) REFERENCES nodes(id),
             FOREIGN KEY(target) REFERENCES nodes(id)
         )
@@ -87,27 +89,29 @@ def get_all_chunks():
     conn.close()
     return [dict(r) for r in rows]
 
-def save_node(node_id, name, node_type, description):
+def save_node(node_id, name, node_type, description, confidence=1.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO nodes (id, name, type, description)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO nodes (id, name, type, description, confidence)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
-            description = excluded.description
-    """, (node_id.lower(), name, node_type, description))
+            description = excluded.description,
+            confidence = excluded.confidence
+    """, (node_id.lower(), name, node_type, description, confidence))
     conn.commit()
     conn.close()
 
-def save_edge(edge_id, source, target, edge_type, quote):
+def save_edge(edge_id, source, target, edge_type, quote, confidence=1.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO edges (id, source, target, type, quote, weight)
-        VALUES (?, ?, ?, ?, ?, 1)
+        INSERT INTO edges (id, source, target, type, quote, weight, confidence)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
         ON CONFLICT(id) DO UPDATE SET
-            weight = weight + 1
-    """, (edge_id, source.lower(), target.lower(), edge_type, quote))
+            weight = weight + 1,
+            confidence = (confidence + excluded.confidence) / 2.0
+    """, (edge_id, source.lower(), target.lower(), edge_type, quote, confidence))
     conn.commit()
     conn.close()
 
@@ -125,30 +129,34 @@ def save_embedding(node_id, embedding_vector):
 
 # Batch save functions — one connection, one commit per batch
 def save_nodes_batch(nodes_list):
-    """Save a list of dicts [{id, name, type, description}, ...] in one transaction."""
+    """Save a list of dicts [{id, name, type, description, confidence}, ...] in one transaction."""
     conn = get_db_connection()
     cursor = conn.cursor()
     for n in nodes_list:
+        conf = n.get("confidence", 1.0)
         cursor.execute("""
-            INSERT INTO nodes (id, name, type, description)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO nodes (id, name, type, description, confidence)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                description = excluded.description
-        """, (n["id"].lower(), n["name"], n["type"], n["description"]))
+                description = excluded.description,
+                confidence = excluded.confidence
+        """, (n["id"].lower(), n["name"], n["type"], n["description"], conf))
     conn.commit()
     conn.close()
 
 def save_edges_batch(edges_list):
-    """Save a list of dicts [{id, source, target, type, quote}, ...] in one transaction."""
+    """Save a list of dicts [{id, source, target, type, quote, confidence}, ...] in one transaction."""
     conn = get_db_connection()
     cursor = conn.cursor()
     for e in edges_list:
+        conf = e.get("confidence", 1.0)
         cursor.execute("""
-            INSERT INTO edges (id, source, target, type, quote, weight)
-            VALUES (?, ?, ?, ?, ?, 1)
+            INSERT INTO edges (id, source, target, type, quote, weight, confidence)
+            VALUES (?, ?, ?, ?, ?, 1, ?)
             ON CONFLICT(id) DO UPDATE SET
-                weight = weight + 1
-        """, (e["id"], e["source"].lower(), e["target"].lower(), e["type"], e["quote"]))
+                weight = weight + 1,
+                confidence = (confidence + excluded.confidence) / 2.0
+        """, (e["id"], e["source"].lower(), e["target"].lower(), e["type"], e["quote"], conf))
     conn.commit()
     conn.close()
 
