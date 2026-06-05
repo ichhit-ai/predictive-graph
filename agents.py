@@ -193,6 +193,10 @@ def llm_call(model_name, prompt, system_instruction=None, json_mode=False, api_k
             llm_limiter.acquire()
             response = model.generate_content(prompt)
             
+            # Check for safety blocks
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                raise ValueError(f"Blocked by safety: {response.prompt_feedback.block_reason}")
+                
             # Check for native function calls
             try:
                 candidate = response.candidates[0]
@@ -211,7 +215,19 @@ def llm_call(model_name, prompt, system_instruction=None, json_mode=False, api_k
             return response.text
         except Exception as e:
             err_msg = str(e)
-            if "429" in err_msg or "ResourceExhausted" in err_msg:
+            if "blocked" in err_msg.lower() or "safety" in err_msg.lower():
+                raise RuntimeError(
+                    "Gemini API request blocked by Safety Filters. This often happens if the "
+                    "content of the document (e.g., a personal diary) contains sensitive personal reflections, "
+                    "names, or topics flagged by safety policy guidelines."
+                ) from e
+            elif "quota" in err_msg.lower():
+                raise RuntimeError(
+                    "Gemini API Daily Quota Exceeded. You have used all available requests "
+                    "for the day on the Free Tier (1,500 requests per day limit). "
+                    "Please wait until your quota resets or supply a Paid Tier API key."
+                ) from e
+            elif "429" in err_msg or "ResourceExhausted" in err_msg:
                 # Attempt to parse dynamic sleep time from Google gateway message
                 match = re.search(r"retry in (\d+\.\d+|\d+)s", err_msg)
                 sleep_time = float(match.group(1)) + 1.0 if match else delay
@@ -219,7 +235,11 @@ def llm_call(model_name, prompt, system_instruction=None, json_mode=False, api_k
                 delay *= 2
             else:
                 raise e
-    raise Exception("Max retries exceeded for LLM call.")
+    raise RuntimeError(
+        "Gemini API rate limit exceeded (Max retries reached). You have hit the Free Tier "
+        "Requests Per Minute (15 RPM) or Tokens Per Minute (TPM) limit. Please wait 60 seconds "
+        "and try again, or upgrade to a Paid Tier key."
+    )
 
 # Robust embedding call with exponential backoff for rate limits
 def generate_embedding_with_backoff(model_name, content, api_key=None):
@@ -289,8 +309,8 @@ def entity_stem(name):
     # Lowercase, replace non-word characters
     cleaned = re.sub(r'[^\w\s]', '', name.lower())
     tokens = cleaned.split()
-    # Filter out suffixes and honorifics
-    filtered = [t for t in tokens if t not in SUFFIXES_AND_HONORIFICS]
+    # Filter out suffixes, honorifics, and single-character initials (like middle names)
+    filtered = [t for t in tokens if t not in SUFFIXES_AND_HONORIFICS and len(t) > 1]
     return " ".join(filtered).strip()
 
 # Pure Python Robust Fuzzy similarity for Entity Resolution
@@ -306,7 +326,19 @@ def token_similarity(str1, str2):
     if stem1 and stem2 and stem1 == stem2:
         return 1.0
         
-    # N-gram similarity (handles spelling variations like "August" / "Auguste")
+    # Token sets
+    def get_tokens(s):
+        return set(re.findall(r"\w+", s))
+    t1, t2 = get_tokens(s1), get_tokens(s2)
+    if not t1 or not t2:
+        return 0.0
+        
+    # Calculate Jaccard similarity of tokens
+    intersection = len(t1.intersection(t2))
+    union = len(t1.union(t2))
+    jaccard_sim = intersection / union if union else 0.0
+    
+    # N-gram similarity (handles minor spelling variations like "August" / "Auguste")
     def get_ngrams(s, n=3):
         return set(s[i:i+n] for i in range(len(s) - n + 1))
         
@@ -315,28 +347,11 @@ def token_similarity(str1, str2):
     if ng1 and ng2:
         char_sim = len(ng1.intersection(ng2)) / len(ng1.union(ng2))
         
-    # Token-level matching
-    def get_tokens(s):
-        return set(re.findall(r"\w+", s))
-    t1, t2 = get_tokens(s1), get_tokens(s2)
-    if not t1 or not t2:
-        return char_sim
+    # If character similarity is extremely high (spelling variation), return the max
+    if char_sim > 0.70:
+        return max(jaccard_sim, char_sim)
         
-    # Check containment with partial match (handles "Dupin" in "C. Auguste Dupin")
-    match_count = 0
-    for tok1 in t1:
-        for tok2 in t2:
-            if tok1 == tok2 or (len(tok1) > 3 and len(tok2) > 3 and (tok1 in tok2 or tok2 in tok1)):
-                match_count += 1
-                break
-                
-    containment_sim = match_count / min(len(t1), len(t2))
-    
-    # If containment matches completely or character overlap is high, resolve them
-    if containment_sim >= 0.85 or char_sim > 0.55:
-        return 0.85
-        
-    return char_sim
+    return jaccard_sim
 
 def cosine_similarity(v1, v2):
     if not v1 or not v2:
@@ -683,7 +698,7 @@ class ArchitectAgent:
         print(f"  [Graph] Saved {len(nodes_batch)} nodes, {len(edges_batch)} edges, {len(embeddings_batch)} embeddings")
 
 class DirectorAgent:
-    """Agent 3: Analyzes graph metadata, spawns 5 specialists, and runs simulations."""
+    """Agent 3: Analyzes graph metadata, spawns 10 specialists, and runs simulations."""
     def __init__(self, api_key=None, model_name="gemini-3.1-flash-lite"):
         self.api_key = api_key
         self.model_name = model_name
@@ -708,7 +723,7 @@ class DirectorAgent:
         You are the Swarm Director. Analyze this Knowledge Graph snapshot (top central nodes):
         {nodes_str}
         
-        Generate exactly 5 distinct, highly specialized predictive and causal-chain forecasting personas tailored specifically to analyze and simulate outcomes for this ecosystem (e.g. if the graph is about a crime, spawn "Forensic Causal Forecaster", "Motive Profiler"; if corporate, spawn "Supply Chain Impact Forecaster", etc.).
+        Generate exactly 10 distinct, highly specialized predictive and causal-chain forecasting personas tailored specifically to analyze and simulate outcomes for this ecosystem (e.g. if the graph is about a crime, spawn "Forensic Causal Forecaster", "Motive Profiler"; if corporate, spawn "Supply Chain Impact Forecaster", etc.). Ensure they have diverse specialties.
         
         Output a strict JSON array of objects:
         [

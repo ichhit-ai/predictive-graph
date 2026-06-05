@@ -138,11 +138,11 @@ with st.sidebar:
                 os.remove(temp_path)
                 
             # Trigger Specialist Spawn
-            with st.spinner("Spawning 5 Specialist Agents..."):
+            with st.spinner("Spawning 10 Specialist Agents..."):
                 director = agents.DirectorAgent(api_key=st.session_state.api_key)
                 st.session_state.specialists = director.analyze_and_spawn_swarm()
                 
-            st.success("5 Specialist Agents generated and active!")
+            st.success("10 Specialist Agents generated and active!")
             st.rerun()
             
     if not st.session_state.api_key:
@@ -165,9 +165,14 @@ with col1:
     else:
         st.write(f"**Canonical Nodes:** {len(nodes)} | **Weighted Edges:** {len(edges)}")
         
-        # Interactive Node list
-        node_df = [{"Name": n["name"], "Type": n["type"], "Description": n["description"]} for n in nodes]
-        st.dataframe(node_df, use_container_width=True, height=280)
+        # Interactive tables via Tabs
+        tab1, tab2 = st.tabs(["📌 Nodes Table", "🔗 Edges Table"])
+        with tab1:
+            node_df = [{"Name": n["name"], "Type": n["type"], "Description": n["description"]} for n in nodes]
+            st.dataframe(node_df, use_container_width=True, height=250)
+        with tab2:
+            edge_df = [{"Source": e["source"], "Relationship": e["type"], "Target": e["target"], "Confidence": e.get("confidence", 1.0), "Context/Evidence": e.get("quote", "")} for e in edges]
+            st.dataframe(edge_df, use_container_width=True, height=250)
         
         # Interactive 2D Force Graph Render (High-clarity with text labels and mouse zoom)
         graph_data = {
@@ -197,28 +202,40 @@ with col1:
           </style>
         </head>
         <body>
+          <div id="controls" style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+             <button onclick="Graph.zoomToFit(400)" style="background: rgba(11,12,16,0.9); border: 1px solid #38bdf8; color: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: sans-serif;">🔍 Recenter</button>
+          </div>
           <div id="2d-graph"></div>
           <script>
             const gData = {graph_data_json};
             
             const typeColors = {{
-                'person': '#ff71ce',
-                'company': '#01cdfe',
-                'organization': '#01cdfe',
-                'location': '#05ffa1',
-                'event': '#b967ff',
-                'technology': '#fffb96',
-                'concept': '#00f0ff'
+                'person': '#ff4b91',
+                'company': '#00d2ff',
+                'organization': '#00d2ff',
+                'location': '#00f5d4',
+                'event': '#9b5de5',
+                'technology': '#fee440',
+                'concept': '#ff9f1c'
             }};
             
             function getColor(type) {{
-                if (!type) return '#8b929a';
+                if (!type) return '#a8dadc';
                 const t = type.toLowerCase();
                 for (const [k, v] of Object.entries(typeColors)) {{
                     if (t.includes(k)) return v;
                 }}
-                return '#8b929a';
+                return '#a8dadc';
             }}
+
+            // Pre-calculate node degrees for centrality sizing
+            const degrees = {{}};
+            gData.links.forEach(l => {{
+                const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+                const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
+                degrees[srcId] = (degrees[srcId] || 0) + 1;
+                degrees[tgtId] = (degrees[tgtId] || 0) + 1;
+            }});
 
             const Graph = ForceGraph()(document.getElementById('2d-graph'))
                 .graphData(gData)
@@ -227,26 +244,36 @@ with col1:
                 .showNavInfo(false)
                 .nodeCanvasObject((node, ctx, globalScale) => {{
                     const label = node.name;
+                    const degree = degrees[node.id] || 0;
+                    const radius = Math.min(12, 4.5 + degree * 1.2);
                     const fontSize = 11 / Math.max(0.5, globalScale * 0.4);
-                    ctx.font = `${{fontSize}}px sans-serif`;
+                    
+                    // Draw node glow/shadow
+                    ctx.shadowColor = getColor(node.type);
+                    ctx.shadowBlur = 12;
                     
                     // Draw colored dot
                     ctx.beginPath();
-                    ctx.arc(node.x, node.y, 5, 0, 2 * Math.PI, false);
+                    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
                     ctx.fillStyle = getColor(node.type);
                     ctx.fill();
-                    ctx.strokeStyle = '#fff';
-                    ctx.lineWidth = 0.5;
+                    
+                    ctx.shadowBlur = 0; // Disable shadow for strokes and text
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 0.8;
                     ctx.stroke();
 
                     // Draw text label
+                    ctx.font = `bold ${{fontSize}}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillStyle = '#e2e8f0';
-                    ctx.fillText(label, node.x, node.y + 7);
+                    ctx.fillText(label, node.x, node.y + radius + 3);
                 }})
                 .linkWidth(link => Math.log(link.weight || 1) + 1.2)
-                .linkColor(link => 'rgba(255, 255, 255, 0.18)')
+                .linkColor(link => 'rgba(255, 255, 255, 0.25)')
+                .linkDirectionalArrowLength(4)
+                .linkDirectionalArrowRelPos(0.95)
                 .linkDirectionalParticles(2)
                 .linkDirectionalParticleWidth(1.8)
                 .linkDirectionalParticleSpeed(0.006)
@@ -269,11 +296,11 @@ with col1:
         st.components.v1.html(html_content, height=410)
 
 with col2:
-    st.markdown("<h3 style='color:#38bdf8;'>👥 Spawned Swarm (5 Specialists)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color:#38bdf8;'>👥 Spawned Swarm (10 Specialists)</h3>", unsafe_allow_html=True)
     if not st.session_state.specialists:
         st.info("The swarm will spawn automatically after graph ingestion.")
     else:
-        # Render the 5 spawned agents as expanders
+        # Render the 10 spawned agents as expanders
         for idx, agent in enumerate(st.session_state.specialists):
             with st.expander(f"🤖 Agent {idx+1}: {agent['name']} ({agent['focus']})"):
                 st.markdown(f"**System Prompt:**\n`{agent['system_prompt']}`")
@@ -288,7 +315,7 @@ else:
     scenario = st.text_input("Type a 'What-If' Trigger Scenario:", placeholder="e.g. What if there is a severe shortage of components?")
     
     if scenario and st.button("🔥 Run Simulation"):
-        with st.spinner("Orchestrating 5-agent debate loop (2 rounds)..."):
+        with st.spinner("Orchestrating 10-agent debate loop (2 rounds)..."):
             director = agents.DirectorAgent(api_key=st.session_state.api_key)
             synthesis, debate_history = director.run_simulation(scenario, st.session_state.specialists)
             
