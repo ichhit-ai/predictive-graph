@@ -326,7 +326,7 @@ def token_similarity(str1, str2):
     match_count = 0
     for tok1 in t1:
         for tok2 in t2:
-            if tok1 == tok2 or tok1 in tok2 or tok2 in tok1:
+            if tok1 == tok2 or (len(tok1) > 3 and len(tok2) > 3 and (tok1 in tok2 or tok2 in tok1)):
                 match_count += 1
                 break
                 
