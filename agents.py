@@ -814,11 +814,11 @@ class DirectorAgent:
                     if name == "web_search":
                         search_results = web_search(query)
                         tool_data = f"\n\n[Agent Requested Web Search: '{query}']\n[Results:\n{search_results}\n]"
-                        tool_badge = f"\n*(Tool Used: web_search('{query}'))*"
+                        tool_badge = f"<br><span style='color: #00f5d4; font-size: 0.85rem; font-style: italic;'>🔍 Tool Used: web_search('{query}')</span>"
                     elif name == "reddit_search":
                         search_results = reddit_search(query)
                         tool_data = f"\n\n[Agent Requested Reddit Search: '{query}']\n[Results:\n{search_results}\n]"
-                        tool_badge = f"\n*(Tool Used: reddit_search('{query}'))*"
+                        tool_badge = f"<br><span style='color: #00f5d4; font-size: 0.85rem; font-style: italic;'>🔍 Tool Used: reddit_search('{query}')</span>"
                 else:
                     res_str = str(res).strip()
                 

@@ -319,6 +319,22 @@ with col2:
         for idx, agent in enumerate(st.session_state.specialists):
             with st.expander(f"🤖 Agent {idx+1}: {agent['name']} ({agent['focus']})"):
                 st.markdown(f"**System Prompt:**\n`{agent['system_prompt']}`")
+        
+        # Explicitly show Visualizer and Shared Tools in the UI
+        with st.expander("📊 Utility Agent: Data Visualizer & Coder"):
+            st.markdown("""
+            **Focus:** Scanning debate logs for numerical forecast trends, auto-generating and sandboxing matplotlib code.
+            
+            **System Prompt:**
+            `You are a Data Visualization Expert. Analyze the scenario and debate history. Output Python matplotlib code with a custom dark-mode theme to render predictive charts.`
+            """)
+            
+        with st.expander("🔍 Shared Swarm Tools"):
+            st.markdown("""
+            All specialists can call external tools to ground their predictions:
+            1. **`web_search(query)`**: Search Google/web for real-time compliance updates and news.
+            2. **`reddit_search(query)`**: Search Reddit for public sentiment and merchant discussions.
+            """)
 
 # Bottom section for Simulation/Predictions
 st.markdown("<h3 style='color:#818cf8;'>🔮 Predictive Simulation Arena</h3>", unsafe_allow_html=True)
