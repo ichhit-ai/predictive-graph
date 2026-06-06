@@ -138,11 +138,11 @@ with st.sidebar:
                 os.remove(temp_path)
                 
             # Trigger Specialist Spawn
-            with st.spinner("Spawning 10 Specialist Agents..."):
+            with st.spinner("Spawning 5 Specialist Agents..."):
                 director = agents.DirectorAgent(api_key=st.session_state.api_key)
                 st.session_state.specialists = director.analyze_and_spawn_swarm()
                 
-            st.success("10 Specialist Agents generated and active!")
+            st.success("5 Specialist Agents generated and active!")
             st.rerun()
             
     if not st.session_state.api_key:
@@ -296,11 +296,11 @@ with col1:
         st.components.v1.html(html_content, height=410)
 
 with col2:
-    st.markdown("<h3 style='color:#38bdf8;'>👥 Spawned Swarm (10 Specialists)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color:#38bdf8;'>👥 Spawned Swarm (5 Specialists)</h3>", unsafe_allow_html=True)
     if not st.session_state.specialists:
         st.info("The swarm will spawn automatically after graph ingestion.")
     else:
-        # Render the 10 spawned agents as expanders
+        # Render the 5 spawned agents as expanders
         for idx, agent in enumerate(st.session_state.specialists):
             with st.expander(f"🤖 Agent {idx+1}: {agent['name']} ({agent['focus']})"):
                 st.markdown(f"**System Prompt:**\n`{agent['system_prompt']}`")
@@ -315,7 +315,7 @@ else:
     scenario = st.text_input("Type a 'What-If' Trigger Scenario:", placeholder="e.g. What if there is a severe shortage of components?")
     
     if scenario and st.button("🔥 Run Simulation"):
-        with st.spinner("Orchestrating 10-agent debate loop (2 rounds)..."):
+        with st.spinner("Orchestrating 5-agent debate loop (2 rounds)..."):
             director = agents.DirectorAgent(api_key=st.session_state.api_key)
             synthesis, debate_history = director.run_simulation(scenario, st.session_state.specialists)
             

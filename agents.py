@@ -698,7 +698,7 @@ class ArchitectAgent:
         print(f"  [Graph] Saved {len(nodes_batch)} nodes, {len(edges_batch)} edges, {len(embeddings_batch)} embeddings")
 
 class DirectorAgent:
-    """Agent 3: Analyzes graph metadata, spawns 10 specialists, and runs simulations."""
+    """Agent 3: Analyzes graph metadata, spawns 5 specialists, and runs simulations."""
     def __init__(self, api_key=None, model_name="gemini-3.1-flash-lite"):
         self.api_key = api_key
         self.model_name = model_name
@@ -723,7 +723,7 @@ class DirectorAgent:
         You are the Swarm Director. Analyze this Knowledge Graph snapshot (top central nodes):
         {nodes_str}
         
-        Generate exactly 10 distinct, highly specialized predictive and causal-chain forecasting personas tailored specifically to analyze and simulate outcomes for this ecosystem (e.g. if the graph is about a crime, spawn "Forensic Causal Forecaster", "Motive Profiler"; if corporate, spawn "Supply Chain Impact Forecaster", etc.). Ensure they have diverse specialties.
+        Generate exactly 5 distinct, highly specialized predictive and causal-chain forecasting personas tailored specifically to analyze and simulate outcomes for this ecosystem (e.g. if the graph is about a crime, spawn "Forensic Causal Forecaster", "Motive Profiler"; if corporate, spawn "Supply Chain Impact Forecaster", etc.). Ensure they have diverse specialties.
         
         Output a strict JSON array of objects:
         [

@@ -16,7 +16,7 @@ A production-grade, high-fidelity predictive intelligence platform. It transitio
                            │
            ┌───────────────┴───────────────┐
      SQLite Database              Specialist Agent Swarm
-     (WAL Enabled)                (10 Domain-Specific Personas)
+     (WAL Enabled)                (5 Domain-Specific Personas)
            │                               │
            └───────────────┬───────────────┘
                            ▼
@@ -47,7 +47,7 @@ A production-grade, high-fidelity predictive intelligence platform. It transitio
 * **Intelligent API Guardrails:** Automatically intercepts Google Gemini safety blocks (common when uploading personal diaries) and Daily Quota Exhaustion limits, stopping requests instantly and reporting clear explanations to the user instead of timing out or retrying.
 
 ### 3. Scaled Multi-Agent Debate Arena
-* **10-Agent Specialist Swarm:** Dynamically spawns **10 distinct domain specialist personas** customized to the uploaded document's context for a wider variety of forecasting perspectives.
+* **5-Agent Specialist Swarm:** Dynamically spawns **5 distinct domain specialist personas** customized to the uploaded document's context for a wider variety of forecasting perspectives.
 * **Dynamic Semantic Subgraphs:** Cosine similarity maps each agent's specialty directly to entity vector embeddings, injecting only the top 15 most relevant nodes/edges into their prompt context.
 * **Adversarial Debate Loop:** 
   * *Round 1:* Agents analyze their subgraphs and make initial forecasts.
@@ -105,5 +105,5 @@ streamlit run app.py
 2. **Ingest Document:** Upload a PDF file (e.g., a report, incident log, or narrative). The system will automatically chunk, extract, resolve, and store your graph.
 3. **Inspect the Graph:** Explore the interactive 2D Canvas force-graph in the dashboard, or switch tabs to check raw Nodes/Edges tables.
 4. **Trigger Scenario:** Type a what-if query (e.g., *"What if the windows were locked from the inside?"*) and press **Run Simulation**.
-5. **Watch the Debate:** Observe the 10 specialists request real-world information and debate.
+5. **Watch the Debate:** Observe the 5 specialists request real-world information and debate.
 6. **Executive Summary:** Read the final consolidated predictive synthesis, containing causal steps and confidence metrics.
