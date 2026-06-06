@@ -11,11 +11,12 @@ A production-grade, high-fidelity predictive intelligence platform. It transitio
                            │
         Cascaded Graph Extraction (Sliding Window)
                            │
-             Fuzzy Entity Resolution & Deduplication
+         Strict Entity Resolution & Deduplication
+              (Jaccard Stemming & Initials Stripping)
                            │
            ┌───────────────┴───────────────┐
      SQLite Database              Specialist Agent Swarm
-     (WAL Enabled)                (Dynamic Personas)
+     (WAL Enabled)                (10 Domain-Specific Personas)
            │                               │
            └───────────────┬───────────────┘
                            ▼
@@ -37,21 +38,28 @@ A production-grade, high-fidelity predictive intelligence platform. It transitio
 ### 1. Ingestion & Graph Construction
 * **Adaptive Spaced Ontology:** Samples text fragments across the **Start, Middle, and End** of the document, ensuring complete visibility and prevention of schema loss in large files.
 * **Sliding Context Window:** Tracks key proper nouns from preceding chunks ($N-2$, $N-1$) and injects them into chunk $N$'s extraction prompt to resolve cross-chunk entity references.
-* **Fuzzy Entity Resolution:** Standardizes orthographic variations (e.g., resolving `"Dupin"`, `"Auguste Dupin"`, and `"C. Auguste Dupin"` to a single canonical entity) using token Jaccard similarity and character-level overlap, automatically merging their descriptions.
+* **Hardened Entity Resolution:** Standardizes orthographic variations (e.g., resolving `"Joe R. Reeder"`, `"Joe Reeder"`, and `"J. Reeder"` to a single canonical entity) using **strict Jaccard token/N-gram character similarity** and initials stripping, eliminating loose containment snowballing.
 * **Junk Entity Filtering:** Excludes pronouns, fragments, and non-descriptive nouns (e.g., `"body"`, `"face"`, `"victim"`) from polluting the network topology.
 
 ### 2. High-Performance Bottleneck Mitigations
 * **Batch Embedding Generation:** Bundles chunk and entity vector generations into single parallel requests (up to 100 items per request), accelerating ingestion speed by **10x**.
-* **Sliding character-based rate limiter:** Monitors token and character flow (max 90,000 characters per minute), automatically pausing and resuming requests to prevent hitting Google's TPM limits.
-* **SQLite Transaction Batching:** Collects extracted nodes, edges, and embeddings into single-commit transactions, reducing database lock cycles to exactly **3 operations** per file upload.
+* **Sliding Character & Token Limiter:** Monitors token and character flow (max 90,000 characters per minute), automatically pausing and resuming requests to prevent hitting Google's TPM limits.
+* **Intelligent API Guardrails:** Automatically intercepts Google Gemini safety blocks (common when uploading personal diaries) and Daily Quota Exhaustion limits, stopping requests instantly and reporting clear explanations to the user instead of timing out or retrying.
 
-### 3. Differentiated Multi-Agent Debate Arena
-* **Dynamic Specialist Swarm:** Generates 5 distinct expert personas customized to the uploaded document's domain.
-* **Dynamic Semantic Subgraphs:** Instead of passing the entire graph to every agent, the engine calculates the cosine similarity between each agent's focus and stored entity embeddings, injecting only the top 15 most relevant nodes and connecting edges.
+### 3. Scaled Multi-Agent Debate Arena
+* **10-Agent Specialist Swarm:** Dynamically spawns **10 distinct domain specialist personas** customized to the uploaded document's context for a wider variety of forecasting perspectives.
+* **Dynamic Semantic Subgraphs:** Cosine similarity maps each agent's specialty directly to entity vector embeddings, injecting only the top 15 most relevant nodes/edges into their prompt context.
 * **Adversarial Debate Loop:** 
   * *Round 1:* Agents analyze their subgraphs and make initial forecasts.
   * *Round 2 (Adversarial):* Agents are explicitly instructed to reference, challenge, or counter at least one claim made by another specialist in Round 1.
 * **Real-World Scrapers Grounding:** Agents can execute keyless searches via Yahoo Search or scrape Reddit comments using inline `[SEARCH: <query>]` and `[REDDIT: <query>]` tags, grounding simulations in live information.
+
+### 4. Advanced 2D ForceGraph UI
+* **Degree-Centrality Scaling:** Node radius scales dynamically based on the connection density of each node (larger hubs stand out immediately).
+* **Relationship Directionality:** Adds directional arrowheads on graph edges to map causal propagation paths clearly.
+* **Camera Controls:** Includes a dedicated **Recenter Graph** button to dynamically reset the canvas zoom and position.
+* **Rich Glassmorphic Design:** Standardised neon-glow shadows, clean styling, and dark mode optimizations.
+* **Data Transparency Explorer:** Built-in tabbed layout for viewing structured **Nodes Table** and **Edges Table** with confidence scores, relationship types, and source evidence quotes.
 
 ---
 
@@ -95,7 +103,7 @@ streamlit run app.py
 ### Steps to Simulate:
 1. **API Credentials:** Provide your `Gemini API Key` in the sidebar (if not set in the environment).
 2. **Ingest Document:** Upload a PDF file (e.g., a report, incident log, or narrative). The system will automatically chunk, extract, resolve, and store your graph.
-3. **Inspect the Graph:** Explore the interactive 2D Canvas force-graph in the dashboard.
+3. **Inspect the Graph:** Explore the interactive 2D Canvas force-graph in the dashboard, or switch tabs to check raw Nodes/Edges tables.
 4. **Trigger Scenario:** Type a what-if query (e.g., *"What if the windows were locked from the inside?"*) and press **Run Simulation**.
-5. **Watch the Debate:** Observe the 5 specialists request real-world information and debate.
+5. **Watch the Debate:** Observe the 10 specialists request real-world information and debate.
 6. **Executive Summary:** Read the final consolidated predictive synthesis, containing causal steps and confidence metrics.
