@@ -118,8 +118,17 @@ with st.sidebar:
     st.markdown("<h3 style='color: #e2e8f0;'>📂 Ingest Document</h3>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload PDF File", type=["pdf"])
     
-    if uploaded_file and st.session_state.api_key:
-        if st.button("🚀 Process & Build Graph", use_container_width=True):
+    # Check if local test_document.pdf exists
+    test_pdf_path = os.path.join(os.path.dirname(__file__), "test_document.pdf")
+    has_test_pdf = os.path.exists(test_pdf_path)
+    
+    load_test = False
+    if has_test_pdf and st.session_state.api_key:
+        if st.button("🧪 Ingest test_document.pdf (5 pages)", use_container_width=True):
+            load_test = True
+            
+    if (uploaded_file or load_test) and st.session_state.api_key:
+        if load_test or st.button("🚀 Process & Build Graph", use_container_width=True):
             # Reset old states instantly so old data doesn't persist during loading
             st.session_state.specialists = []
             st.session_state.ingestion_done = False
@@ -127,10 +136,14 @@ with st.sidebar:
             st.session_state.debate_history = []
             st.session_state.chart_info = None
             
-            # Save uploaded file locally
+            # Save uploaded file locally or copy test doc
             temp_path = os.path.join(os.path.dirname(__file__), "temp_uploaded.pdf")
-            with open(temp_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+            if load_test:
+                import shutil
+                shutil.copy(test_pdf_path, temp_path)
+            else:
+                with open(temp_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
             
             with st.spinner("Processing PDF and chunking..."):
                 # Clear previous database state
