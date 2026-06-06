@@ -80,6 +80,12 @@ if "specialists" not in st.session_state:
     st.session_state.specialists = []
 if "ingestion_done" not in st.session_state:
     st.session_state.ingestion_done = False
+if "synthesis" not in st.session_state:
+    st.session_state.synthesis = ""
+if "debate_history" not in st.session_state:
+    st.session_state.debate_history = []
+if "chart_info" not in st.session_state:
+    st.session_state.chart_info = None
 
 # Sidebar Configuration
 with st.sidebar:
@@ -99,6 +105,9 @@ with st.sidebar:
         database.clear_db()
         st.session_state.specialists = []
         st.session_state.ingestion_done = False
+        st.session_state.synthesis = ""
+        st.session_state.debate_history = []
+        st.session_state.chart_info = None
         st.success("App state reset successfully!")
         st.rerun()
         
@@ -111,6 +120,9 @@ with st.sidebar:
             # Reset old states instantly so old data doesn't persist during loading
             st.session_state.specialists = []
             st.session_state.ingestion_done = False
+            st.session_state.synthesis = ""
+            st.session_state.debate_history = []
+            st.session_state.chart_info = None
             
             # Save uploaded file locally
             temp_path = os.path.join(os.path.dirname(__file__), "temp_uploaded.pdf")
@@ -306,7 +318,6 @@ with col2:
                 st.markdown(f"**System Prompt:**\n`{agent['system_prompt']}`")
 
 # Bottom section for Simulation/Predictions
-st.markdown("---")
 st.markdown("<h3 style='color:#818cf8;'>🔮 Predictive Simulation Arena</h3>", unsafe_allow_html=True)
 
 if not st.session_state.specialists:
@@ -317,9 +328,13 @@ else:
     if scenario and st.button("🔥 Run Simulation"):
         with st.spinner("Orchestrating 5-agent debate loop (2 rounds)..."):
             director = agents.DirectorAgent(api_key=st.session_state.api_key)
-            synthesis, debate_history = director.run_simulation(scenario, st.session_state.specialists)
+            synthesis, debate_history, chart_info = director.run_simulation(scenario, st.session_state.specialists)
+            st.session_state.synthesis = synthesis
+            st.session_state.debate_history = debate_history
+            st.session_state.chart_info = chart_info
             
-        # Display Results
+    # Persistently display results if they exist in state
+    if st.session_state.synthesis:
         sc_col1, sc_col2 = st.columns([1, 1])
         
         with sc_col1:
@@ -327,10 +342,21 @@ else:
             # Render logs grouped by round
             for round_idx in range(1, 3):
                 st.markdown(f"**Round {round_idx}**")
-                round_comments = [c for c in debate_history if c["round"] == round_idx]
+                round_comments = [c for c in st.session_state.debate_history if c["round"] == round_idx]
                 for comment in round_comments:
                     st.markdown(f"<div class='agent-comment'><b>{comment['agent']}</b>:<br>{comment['text']}</div>", unsafe_allow_html=True)
                     
         with sc_col2:
             st.markdown("<h4 style='color:#818cf8;'>📈 Forecast Synthesis Report</h4>", unsafe_allow_html=True)
-            st.markdown(synthesis)
+            st.markdown(st.session_state.synthesis)
+            
+            # Display generated chart if available
+            c_info = st.session_state.chart_info
+            if c_info and c_info.get("needs_chart") and c_info.get("success"):
+                chart_path = os.path.join(os.path.dirname(__file__), "scratch", "temp_chart.png")
+                if os.path.exists(chart_path):
+                    st.markdown("---")
+                    st.markdown(f"<h5 style='color:#00f5d4;'>📊 Visual Forecast Analysis</h5>", unsafe_allow_html=True)
+                    st.image(chart_path, caption=c_info.get("chart_description", ""), use_column_width=True)
+                    with st.expander("💻 Show Visualisation Code"):
+                        st.code(c_info.get("python_code", ""), language="python")
