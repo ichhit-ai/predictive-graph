@@ -13,6 +13,9 @@ if os.path.exists(env_path):
 import database
 import agents
 import json
+import importlib
+importlib.reload(agents)
+importlib.reload(database)
 
 # Force page config
 st.set_page_config(page_title="Graphify Swarm", layout="wide", initial_sidebar_state="expanded")
