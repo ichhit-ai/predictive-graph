@@ -389,6 +389,6 @@ else:
                 if os.path.exists(chart_path):
                     st.markdown("---")
                     st.markdown(f"<h5 style='color:#00f5d4;'>📊 Visual Forecast Analysis</h5>", unsafe_allow_html=True)
-                    st.image(chart_path, caption=c_info.get("chart_description", ""), use_column_width=True)
+                    st.image(chart_path, caption=c_info.get("chart_description", ""), use_container_width=True)
                     with st.expander("💻 Show Visualisation Code"):
                         st.code(c_info.get("python_code", ""), language="python")
